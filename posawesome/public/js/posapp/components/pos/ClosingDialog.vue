@@ -1,6 +1,6 @@
 <template>
   <v-row justify="center">
-    <v-dialog v-model="closingDialog" max-width="900px">
+    <v-dialog v-model="closingDialog" max-width="900px" persistent @click:outside="close_dialog">
       <v-card>
         <v-card-title>
           <span class="headline primary--text">{{
@@ -54,6 +54,14 @@
                       {{ currencySymbol(pos_profile.currency) }}
                       {{ formtCurrency(item.expected_amount) }}</template
                     >
+                    <template v-slot:item.sale_amount="{ item }">
+                      {{ currencySymbol(pos_profile.currency) }}
+                      {{
+                        (item.sale = formtCurrency(
+                          item.expected_amount - item.opening_amount
+                        ))
+                      }}
+                    </template>
                   </v-data-table>
                 </template>
               </v-col>
@@ -112,6 +120,9 @@ export default {
   methods: {
     close_dialog() {
       this.closingDialog = false;
+      if (this.$root) {
+        this.$root.$emit('escEventTriggered');
+      }
     },
     submit_dialog() {
       evntBus.$emit('submit_closing_pos', this.dialog_data);
@@ -138,6 +149,14 @@ export default {
           value: 'difference',
           align: 'end',
           sortable: false,
+        });
+      }
+      if (!this.pos_profile.hide_sale_amount) {
+        this.headers.push({
+          text: __('Sale Amount'),
+          align: 'end',
+          sortable: true,
+          value: 'sale_amount',
         });
       }
     });

@@ -17,8 +17,8 @@
         style="cursor: pointer"
         class="text-uppercase primary--text"
       >
-        <span class="font-weight-light">pos</span>
-        <span>awesome</span>
+        <span class="font-weight-light">RMS</span>
+        <span>G2Virtu</span>
       </v-toolbar-title>
 
       <v-spacer></v-spacer>
@@ -176,7 +176,7 @@ export default {
     },
     go_about() {
       const win = window.open(
-        'https://github.com/yrestom/POS-Awesome',
+        'https://www.g2virtu.com',
         '_blank'
       );
       win.focus();

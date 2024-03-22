@@ -16,6 +16,7 @@
               <v-col cols="12" class="pa-1">
                 <template>
                   <v-data-table
+                    ref="myDataTable1"
                     :headers="headers"
                     :items="dialog_data"
                     item-key="name"
@@ -23,6 +24,7 @@
                     :single-select="singleSelect"
                     show-select
                     v-model="selected"
+                    @click:row="onRowClick"
                   >
                     <template v-slot:item.posting_time="{ item }">
                       {{ item.posting_time.split('.')[0] }}
@@ -91,8 +93,80 @@ export default {
       },
     ],
   }),
-  watch: {},
+  mounted() {
+    this.$nextTick(() => {
+      const table = this.$refs.myDataTable1?.$el;
+      if (!table) {
+        console.error("Table element not found.");
+        return;
+      }
+      const tableRows = table.querySelectorAll('tbody > tr');
+      if (tableRows.length > 0) {
+        console.log("Focusing on the first row:", tableRows[0]);
+        tableRows[0].focus();
+      } else {
+        console.error("No rows found in the table.");
+      }
+    });
+  },
+  watch: {
+    dialog_data: {
+      deep: true,
+      handler(newVal, oldVal) {
+        this.$nextTick(() => {
+          const table = this.$refs.myDataTable1.$el;
+          if (!table) return;
+          const tableRows = table.querySelectorAll('tbody > tr');
+          tableRows.forEach((row, index) => {
+            row.setAttribute('tabindex', '0');
+            row.addEventListener('keyup', (event) => {
+              if (event.key === 'ArrowDown') {
+                this.handleRowNavigation(event, index, tableRows, 'down');
+              } else if (event.key === 'ArrowUp') {
+                this.handleRowNavigation(event, index, tableRows, 'up');
+              } else if (event.key === 'Enter') {
+                this.handleEnterKeyPress(event, index, newVal);
+              }
+            });
+          });
+        });
+      },
+    },
+  },
   methods: {
+    focusFirstRow() {
+      this.$nextTick(() => {
+        const table = this.$refs.myDataTable1?.$el;
+        if (!table) {
+          console.error("Table element not found.");
+          return;
+        }
+        const tableRows = table.querySelectorAll('tbody > tr');
+        if (tableRows.length > 0) {
+          console.log("Focusing on the first row:", tableRows[0]);
+          tableRows[0].focus();
+        } else {
+          console.error("No rows found in the table.");
+        }
+      });
+    },
+    handleRowNavigation(event, index, tableRows, direction) {
+      if (direction === 'down' && index < tableRows.length - 1) {
+        tableRows[index + 1].focus();
+      } else if (direction === 'up' && index > 0) {
+        tableRows[index - 1].focus();
+      }
+    },
+
+    handleEnterKeyPress(event, index, new_value) {
+      const item = new_value[index];
+      this.selected = [item];
+      this.submit_dialog();
+      if (this.$root) {
+        this.$root.$emit('escEventTriggered');
+      }
+    },
+
     close_dialog() {
       this.draftsDialog = false;
     },
@@ -103,11 +177,20 @@ export default {
         this.draftsDialog = false;
       }
     },
+    onRowClick(item) {
+      // Handle the click event on the row here
+      this.selected = [item];
+      this.submit_dialog(); // Call the submit_dialog method when the row is clicked
+            if (this.$root) {
+                this.$root.$emit('escEventTriggered');
+            }
+    },
   },
   created: function () {
     evntBus.$on('open_drafts', (data) => {
       this.draftsDialog = true;
       this.dialog_data = data;
+      this.focusFirstRow();
     });
   },
 };

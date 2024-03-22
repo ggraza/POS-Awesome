@@ -17,7 +17,9 @@
               v-model="invoice_name"
               dense
               clearable
+              autofocus
               class="mx-4"
+              @keydown.enter="search_invoices"
             ></v-text-field>
             <v-btn
               text
@@ -32,6 +34,7 @@
             <v-col cols="12" class="pa-1" v-if="dialog_data">
               <template>
                 <v-data-table
+                  ref="myDataTable2"
                   :headers="headers"
                   :items="dialog_data"
                   item-key="name"
@@ -39,6 +42,7 @@
                   :single-select="singleSelect"
                   show-select
                   v-model="selected"
+                  @click:row="onRowClick"
                 >
                   <template v-slot:item.grand_total="{ item }">
                     {{ currencySymbol(item.currency) }}
@@ -104,10 +108,55 @@ export default {
       },
     ],
   }),
-  watch: {},
+  watch: {
+    dialog_data(new_value, old_value) {
+      this.$nextTick(() => {
+        const table = this.$refs.myDataTable2.$el;
+        if (!table) return;
+        const tableRows = table.querySelectorAll('tbody > tr');
+        tableRows.forEach((row, index) => {
+          row.setAttribute('tabindex', '0');
+          row.addEventListener('keyup', (event) => {
+            if (event.key === 'ArrowDown') {
+              this.handleRowNavigation(event, index, tableRows, 'down');
+            } else if (event.key === 'ArrowUp') {
+              this.handleRowNavigation(event, index, tableRows, 'up');
+            } else if (event.key === 'Enter') {
+              this.handleEnterKeyPress(event, index, new_value);
+            }
+          });
+        });
+      });
+    },
+  },
   methods: {
+    handleRowNavigation(event, index, tableRows, direction) {
+      if (direction === 'down' && index < tableRows.length - 1) {
+        tableRows[index + 1].focus();
+      } else if (direction === 'up' && index > 0) {
+        tableRows[index - 1].focus();
+      }
+    },
+
+    handleEnterKeyPress(event, index, new_value) {
+      const item = new_value[index];
+      this.selected = [item];
+      this.submit_dialog();
+      if (this.$root) {
+        this.$root.$emit('escEventTriggered');
+      }
+    },
+    onRowClick(item) {
+      // Handle the click event on the row here
+      this.selected = [item];
+      this.submit_dialog(); // Call the submit_dialog method when the row is clicked
+            if (this.$root) {
+                this.$root.$emit('escEventTriggered');
+            }
+    },
     close_dialog() {
       this.invoicesDialog = false;
+      this.$root.$emit('escEventTriggered');
     },
     search_invoices_by_enter(e) {
       if (e.keyCode === 13) {
@@ -126,6 +175,17 @@ export default {
         callback: function (r) {
           if (r.message) {
             vm.dialog_data = r.message;
+            vm.$nextTick(() => {
+              const table = vm.$refs.myDataTable2.$el;
+              if (!table) return;
+              const firstRow = table.querySelector('tbody tr');
+              if (firstRow) {
+                setTimeout(() => {
+                  firstRow.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+                  firstRow.focus();
+                }, 100);
+              }
+            });
           }
         },
       });
@@ -163,3 +223,4 @@ export default {
   },
 };
 </script>
+
