@@ -91,11 +91,21 @@ Available in GitHub [discussions](https://github.com/yrestom/POS-Awesome/discuss
 
 ### Shortcuts:
 
-- `CTRL or CMD + S` open payments
+- `ALT + F` or `ESC` Focus on search field
+- `ALT + C` focus on Customer Field
+- `CTRL or CMD + S` or `F7` open payments
+- `F7` Submit & Print after open payments
 - `CTRL or CMD + X` submit payments
 - `CTRL or CMD + D` remove first item from the top
-- `CTRL or CMD + A` expand first item from the top
-- `CTRL or CMD + E` focus on discount field
+- `CTRL or CMD + Q` or `F6` or `+` expand first item from the top
+- `CTRL or CMD + +` Increase Qty
+- `CTRL or CMD + -` Decrease Qty
+- `CTRL or CMD + Z` focus on discount field
+- `CTRL or CMD + B` or `F9` Hold Invoice
+- `ALT + B` or `F10` Retrive Invoice
+- `ALT + R` or `F11` Return Invoice
+- `ALT + V` Cancel Current Invoice
+- `CTRL or CMD + H` on hold invoice focus on Search Field
 
 ---
 
