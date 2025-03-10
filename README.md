@@ -53,10 +53,13 @@ One-click installing available if you are hosting on FC from [here](https://frap
 
 1. `bench get-app branch version-14 https://github.com/yrestom/POS-Awesome.git`
 2. `bench setup requirements`
-3. `bench build --app posawesome`
-4. `bench restart`
-5. `bench --site [your.site.name] install-app posawesome`
-6. `bench --site [your.site.name] migrate`
+3. `bench pip install -r apps/posawesome/requirements.txt` OR
+4. `bench pip install qrcode[pil]`
+5. `bench build --app posawesome`
+6. `bench restart`
+7. `bench --site [your.site.name] install-app posawesome`
+8. `bench --site [your.site.name] migrate`
+
 
 ---
 
