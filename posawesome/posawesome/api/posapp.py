@@ -5,7 +5,7 @@
 from __future__ import unicode_literals
 import json
 import frappe
-from frappe.utils import nowdate, flt, cstr, getdate
+from frappe.utils import nowdate, flt, cstr, getdate, add_days
 from frappe import _
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
 from erpnext.stock.get_item_details import get_item_details
@@ -65,33 +65,53 @@ def get_opening_dialog_data():
         mode["currency"] = frappe.get_cached_value(
             "POS Profile", mode["parent"], "currency"
         )
+    data["payments_denomination"] = frappe.get_list(
+        "POS Payment Denomination", 
+        filters={"parent": ["in", pos_profiles_list]},
+        fields=["*"],
+        limit_page_length=0,
+        order_by="parent",
+        ignore_permissions=True,
+    )
 
     return data
 
 
 @frappe.whitelist()
-def create_opening_voucher(pos_profile, company, balance_details):
-    balance_details = json.loads(balance_details)
+def create_opening_voucher(pos_profile, company, balance_details, denomination_details):
+    # Convert the JSON strings to Python objects if they are passed as strings
+    if isinstance(balance_details, str):
+        balance_details = json.loads(balance_details)
+    if isinstance(denomination_details, str):
+        denomination_details = json.loads(denomination_details)
 
-    new_pos_opening = frappe.get_doc(
-        {
-            "doctype": "POS Opening Shift",
-            "period_start_date": frappe.utils.get_datetime(),
-            "posting_date": frappe.utils.getdate(),
-            "user": frappe.session.user,
-            "pos_profile": pos_profile,
-            "company": company,
-            "docstatus": 1,
-        }
-    )
+    # Create a new POS Opening Shift document
+    new_pos_opening = frappe.get_doc({
+        "doctype": "POS Opening Shift",
+        "period_start_date": frappe.utils.get_datetime(),
+        "posting_date": frappe.utils.getdate(),
+        "user": frappe.session.user,
+        "pos_profile": pos_profile,
+        "company": company,
+        "docstatus": 1,
+    })
+
+    # Set balance_details and denomination_details
     new_pos_opening.set("balance_details", balance_details)
+    new_pos_opening.set("denomination_details", denomination_details)
+
+    # Insert the new document into the database
     new_pos_opening.insert(ignore_permissions=True)
 
-    data = {}
-    data["pos_opening_shift"] = new_pos_opening.as_dict()
-    update_opening_shift_data(data, new_pos_opening.pos_profile)
-    return data
+    # Prepare the response data
+    data = {
+        "pos_opening_shift": new_pos_opening.as_dict()
+    }
 
+    # Call the function to update the opening shift data (if needed)
+    update_opening_shift_data(data, new_pos_opening.pos_profile)
+
+    return data
 
 @frappe.whitelist()
 def check_opening_shift(user):
@@ -235,7 +255,7 @@ def get_items(
                     ["valid_upto", ">=", today],
                     ["valid_upto", "in", ["", None]],
                 ],
-                order_by="valid_from ASC, valid_upto DESC",
+                order_by="valid_from DESC, valid_upto DESC",
             )
 
             item_prices = {}
@@ -442,11 +462,14 @@ def get_customer_names(pos_profile):
 
 @frappe.whitelist()
 def get_sales_person_names():
-    sales_persons = frappe.get_list(
-        "Sales Person",
-        filters={"enabled": 1},
-        fields=["name", "sales_person_name"],
-        limit_page_length=100000,
+    sales_persons = frappe.db.sql(
+        """
+        SELECT name, sales_person_name
+        FROM `tabSales Person`
+        ORDER by name
+        LIMIT 0, 10000
+        """,
+        as_dict=1,
     )
     return sales_persons
 
@@ -490,7 +513,6 @@ def update_invoice_from_order(data):
     invoice_doc.update(data)
     invoice_doc.save()
     return invoice_doc
-
 
 @frappe.whitelist()
 def update_invoice(data):
@@ -539,13 +561,6 @@ def update_invoice(data):
         if invoice_doc.get("taxes"):
             for tax in invoice_doc.taxes:
                 tax.included_in_print_rate = 1
-
-    today_date = getdate()
-    if (
-        invoice_doc.get("posting_date")
-        and getdate(invoice_doc.posting_date) != today_date
-    ):
-        invoice_doc.set_posting_time = 1
 
     invoice_doc.save()
     return invoice_doc
@@ -622,20 +637,11 @@ def submit_invoice(invoice, data):
     if frappe.get_value("POS Profile", invoice_doc.pos_profile, "posa_auto_set_batch"):
         set_batch_nos(invoice_doc, "warehouse", throw=True)
     set_batch_nos_for_bundels(invoice_doc, "warehouse", throw=True)
-
+    invoice_doc.due_date = data.get("due_date")
     invoice_doc.flags.ignore_permissions = True
     frappe.flags.ignore_account_permission = True
     invoice_doc.posa_is_printed = 1
     invoice_doc.save()
-
-    if data.get("due_date"):
-        frappe.db.set_value(
-            "Sales Invoice",
-            invoice_doc.name,
-            "due_date",
-            data.get("due_date"),
-            update_modified=False,
-        )
 
     if frappe.get_value(
         "POS Profile",
@@ -870,6 +876,24 @@ def get_draft_invoices(pos_opening_shift):
             "posa_pos_opening_shift": pos_opening_shift,
             "docstatus": 0,
             "posa_is_printed": 0,
+        },
+        fields=["name"],
+        limit_page_length=0,
+        order_by="modified desc",
+    )
+    data = []
+    for invoice in invoices_list:
+        data.append(frappe.get_cached_doc("Sales Invoice", invoice["name"]))
+    return data
+
+
+@frappe.whitelist()
+def get_submited_invoices(pos_opening_shift):
+    invoices_list = frappe.get_list(
+        "Sales Invoice",
+        filters={
+            "posa_pos_opening_shift": pos_opening_shift,
+            "docstatus": 1,
         },
         fields=["name"],
         limit_page_length=0,
@@ -1239,14 +1263,24 @@ def search_invoices_for_return(invoice_name, company):
 
 @frappe.whitelist()
 def search_orders(company, currency, order_name=None):
+    import datetime
+
+    # Calculate the date range for 7 days before and after today
+    today = datetime.date.today()
+    start_date = today - datetime.timedelta(days=7)
+    end_date = today + datetime.timedelta(days=7)
+
     filters = {
         "billing_status": ["in", ["Not Billed", "Partly Billed"]],
         "docstatus": 1,
         "company": company,
         "currency": currency,
+        "transaction_date": ["between", [start_date, end_date]]
     }
+
     if order_name:
         filters["name"] = ["like", f"%{order_name}%"]
+
     orders_list = frappe.get_list(
         "Sales Order",
         filters=filters,
@@ -1254,11 +1288,11 @@ def search_orders(company, currency, order_name=None):
         limit_page_length=0,
         order_by="customer",
     )
+
     data = []
     for order in orders_list:
         data.append(frappe.get_doc("Sales Order", order["name"]))
     return data
-
 
 def get_version():
     branch_name = get_app_branch("erpnext")
@@ -1795,7 +1829,6 @@ def get_seearch_items_conditions(item_code, serial_no, batch_no, barcode):
         item_code=frappe.db.escape("%" + item_code + "%")
     )
 
-
 @frappe.whitelist()
 def create_sales_invoice_from_order(sales_order):
     sales_invoice = make_sales_invoice(sales_order, ignore_permissions=True)
@@ -1807,7 +1840,6 @@ def create_sales_invoice_from_order(sales_order):
 def delete_sales_invoice(sales_invoice):
     frappe.delete_doc("Sales Invoice", sales_invoice)
 
-
 @frappe.whitelist()
 def get_sales_invoice_child_table(sales_invoice, sales_invoice_item):
     parent_doc = frappe.get_doc("Sales Invoice", sales_invoice)
@@ -1815,3 +1847,50 @@ def get_sales_invoice_child_table(sales_invoice, sales_invoice_item):
         "Sales Invoice Item", {"parent": parent_doc.name, "name": sales_invoice_item}
     )
     return child_doc
+
+@frappe.whitelist()
+def create_return_invoice(data):
+    data = json.loads(data)
+    invoice_doc = frappe.get_doc(data)
+    invoice_doc.insert()
+    return invoice_doc
+
+
+@frappe.whitelist()
+def get_supplier_names(pos_profile=None):
+    # You can filter on supplier_type or territory based on pos_profile if needed
+    suppliers = frappe.get_all(
+        "Supplier",
+        fields=["name", "supplier_name", "tax_id", "email_id", "mobile_no"],
+        order_by="modified desc",
+        limit_page_length=1000
+    )
+
+    # Add primary address
+    for sup in suppliers:
+        address = frappe.get_value("Dynamic Link", {
+            "link_doctype": "Supplier",
+            "link_name": sup.name,
+            "parenttype": "Address"
+        }, "parent")
+        if address:
+            sup["primary_address"] = frappe.get_value("Address", address, "address_line1")
+
+    return suppliers
+
+@frappe.whitelist()
+def get_supplier_names_new(pos_profile=None):
+    supplier = frappe.get_doc("Supplier", supplier)
+
+    res["email_id"] = supplier.email_id
+    res["mobile_no"] = supplier.mobile_no
+    res["image"] = supplier.image
+    res["customer_price_list"] = supplier.default_price_list
+    res["customer_group"] = supplier.supplier_group
+    res["customer_type"] = supplier.supplier_type
+    res["country"] = supplier.country
+    res["tax_id"] = supplier.tax_id
+    res["name"] = supplier.name
+    res["supplier_name"] = supplier.customer_name
+
+    return res

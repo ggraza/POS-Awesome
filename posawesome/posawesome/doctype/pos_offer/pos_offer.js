@@ -105,7 +105,7 @@ const controllers = (frm) => {
 	frm.toggle_reqd('loyalty_points', frm.doc.offer === 'Loyalty Point');
 
 	if (frm.doc.offer === 'Grand Total') {
-		frm.set_df_property('discount_type', 'options', ['Discount Percentage']);
+		frm.set_df_property('discount_type', 'options', ['Discount Percentage', 'Discount Amount']);
 	} else {
 		frm.set_df_property('discount_type', 'options', ['', 'Rate', 'Discount Percentage', 'Discount Amount']);
 	}

@@ -1,7 +1,6 @@
 <template>
   <div>
     <v-autocomplete
-      ref="customerField"
       dense
       clearable
       auto-select-first
@@ -24,7 +23,7 @@
     >
       <template v-slot:item="data">
         <template>
-          <v-list-item-content @click="clickevent()" @keydown.enter="handleEnter" tabindex="0">
+          <v-list-item-content>
             <v-list-item-title
               class="primary--text subtitle-1"
               v-html="data.item.customer_name"
@@ -66,7 +65,6 @@ export default {
   data: () => ({
     pos_profile: '',
     customers: [],
-    selectedCustomer: null,
     customer: '',
     readonly: false,
     customer_info: {},
@@ -77,33 +75,6 @@ export default {
   },
 
   methods: {
-  handleEnter() {
-    // Add your logic for the Enter key press event here
-    console.log('Enter key pressed on v-list-item-content!');
-    // You can call your clickevent or any other function here
-    this.clickevent();
-  },
-
-    clickevent() {
-      if (this.$root) {
-        this.$root.$emit('escEventTriggered');
-      }
-      this.$refs.customerField.blur();
-      evntBus.$emit('update_customer', this.customer);
-    },
-    customer_blur() {
-      this.$refs.customerField.blur();
-    },
-
-    shortCustomer(e) {
-      if (e.key === "c" && e.altKey) {
-        e.preventDefault();
-        if (this.$root) {
-          this.$root.$emit('inputBlurTriggered');
-        }
-        this.$refs.customerField.focus();
-      }
-    },
     get_customer_names() {
       const vm = this;
       if (this.customers.length > 0) {
@@ -161,8 +132,6 @@ export default {
   computed: {},
 
   created: function () {
-    this.$root.$on('customerBlurTriggered', this.customer_blur);
-    document.addEventListener("keydown", this.shortCustomer.bind(this));
     this.$nextTick(function () {
       evntBus.$on('register_pos_profile', (pos_profile) => {
         this.pos_profile = pos_profile;
@@ -189,19 +158,9 @@ export default {
       });
     });
   },
-  destroyed() {
-    document.removeEventListener("keydown", this.shortCustomer);
-  },
 
   watch: {
-    customer(newValue) {
-      if (newValue) {
-        // The v-autocomplete field is filled
-        if (this.$root) {
-          this.$root.$emit('escEventTriggered');
-        }
-        this.$refs.customerField.blur();
-      }
+    customer() {
       evntBus.$emit('update_customer', this.customer);
     },
   },

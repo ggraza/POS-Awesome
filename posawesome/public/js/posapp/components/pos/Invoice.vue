@@ -1,6 +1,6 @@
 <template>
   <div>
-    <v-dialog v-model="cancel_dialog" max-width="330" @keydown.enter="cancel_invoice">
+    <v-dialog v-model="cancel_dialog" max-width="330">
       <v-card>
         <v-card-title class="text-h5">
           <span class="headline primary--text">{{
@@ -9,7 +9,7 @@
         </v-card-title>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="error" @click="cancel_invoice" ref="cancelBtn">
+          <v-btn color="error" @click="cancel_invoice">
             {{ __("Cancel") }}
           </v-btn>
           <v-btn color="warning" @click="cancel_dialog = false">
@@ -165,7 +165,6 @@
             class="elevation-1"
             :items-per-page="itemsPerPage"
             hide-default-footer
-            @click:row="onRowClick"
           >
             <template v-slot:item.qty="{ item }">{{
               formtFloat(item.qty)
@@ -240,27 +239,21 @@
                   </v-col>
                   <v-col cols="4">
                     <v-text-field
-                      ref="qtyField"
                       dense
-                      autofocus
                       outlined
                       color="primary"
                       :label="frappe._('QTY')"
                       background-color="white"
                       hide-details
-                      type="number"
                       :value="formtFloat(item.qty)"
                       @change="
                         [
                           setFormatedFloat(item, 'qty', null, false, $event),
                           calc_stock_qty(item, $event),
-                          $root.$emit('escEventTriggered'),
-                          expandedHandler(),
                         ]
                       "
                       :rules="[isNumber]"
                       :disabled="!!item.posa_is_offer || !!item.posa_is_replace"
-                      @focus="selectAllText"
                     ></v-text-field>
                   </v-col>
                   <v-col cols="4">
@@ -741,7 +734,6 @@
                 :label="frappe._('Total')"
                 outlined
                 dense
-                background-color="yellow"
                 readonly
                 hide-details
                 color="success"
@@ -758,7 +750,21 @@
                 color="warning"
                 dark
                 @click="get_draft_invoices"
-                >{{ __("Retrive") }}</v-btn
+                >{{ __("Held") }}</v-btn
+              >
+            </v-col>
+            <v-col
+              v-if="pos_profile.custom_allow_select_sales_order === 1"
+              cols="6"
+              class="pa-1"
+            >
+              <v-btn
+                block
+                class="pa-0"
+                color="info"
+                dark
+                @click="get_draft_orders"
+                >{{ __("Select S.O") }}</v-btn
               >
             </v-col>
             <v-col cols="6" class="pa-1">
@@ -789,7 +795,7 @@
                 color="accent"
                 dark
                 @click="new_invoice"
-                >{{ __("Hold/Save/New") }}</v-btn
+                >{{ __("Save/New") }}</v-btn
               >
             </v-col>
             <v-col class="pa-1">
@@ -799,7 +805,7 @@
                 color="success"
                 @click="show_payment"
                 dark
-                >{{ __("CHECK OUT/PAY") }}</v-btn
+                >{{ __("PAY") }}</v-btn
               >
             </v-col>
             <v-col
@@ -918,27 +924,6 @@ export default {
   },
 
   methods: {
-    selectAllText() {
-      if (this.$refs.qtyField) {
-        this.$nextTick(() => {
-          this.$refs.qtyField.$el.querySelector('input').select();
-        });
-      }
-    },
-    onRowClick(item) {
-        // Handle the click event on the row here
-        if (this.expanded.length > 0) {
-            this.expanded = [];
-            if (this.$root) {
-                this.$root.$emit('escEventTriggered');
-            }
-        } else {
-            this.expanded.push(item);
-        }
-    },
-    expandedHandler() {
-      this.expanded = []; // Function to handle the 'expanded' array
-    },
     remove_item(item) {
       const index = this.items.findIndex(
         (el) => el.posa_row_id == item.posa_row_id
@@ -952,7 +937,6 @@ export default {
       if (idx >= 0) {
         this.expanded.splice(idx, 1);
       }
-      this.$root.$emit('escEventTriggered');
     },
 
     add_one(item) {
@@ -1088,7 +1072,9 @@ export default {
 
     cancel_invoice() {
       const doc = this.get_invoice_doc();
-      this.invoiceType = "Invoice";
+      this.invoiceType = this.pos_profile.posa_default_sales_order
+        ? "Order"
+        : "Invoice";
       this.invoiceTypes = ["Invoice", "Order"];
       this.posting_date = frappe.datetime.nowdate();
       if (doc.name && this.pos_profile.posa_allow_delete) {
@@ -1118,14 +1104,12 @@ export default {
       this.delivery_charges_rate = 0;
       this.selcted_delivery_charges = {};
       evntBus.$emit("set_customer_readonly", false);
-      this.$root.$emit('escEventTriggered');
       this.cancel_dialog = false;
     },
 
     new_invoice(data = {}) {
       let old_invoice = null;
       evntBus.$emit("set_customer_readonly", false);
-      this.$root.$emit('escEventTriggered');
       this.expanded = [];
       this.posa_offers = [];
       evntBus.$emit("set_pos_coupons", []);
@@ -1430,7 +1414,24 @@ export default {
       return this.invoice_doc;
     },
 
-    proces_invoice() {
+    update_invoice_from_order(doc) {
+      const vm = this;
+      frappe.call({
+        method: "posawesome.posawesome.api.posapp.update_invoice_from_order",
+        args: {
+          data: doc,
+        },
+        async: false,
+        callback: function (r) {
+          if (r.message) {
+            vm.invoice_doc = r.message;
+          }
+        },
+      });
+      return this.invoice_doc;
+    },
+
+    process_invoice() {
       const doc = this.get_invoice_doc();
       if (doc.name) {
         return this.update_invoice(doc);
@@ -1501,7 +1502,6 @@ export default {
       } else {
         evntBus.$emit("show_payment", "true");
         const invoice_doc = this.process_invoice();
-        const invoice_doc = this.proces_invoice();
         evntBus.$emit("send_invoice_doc_payment", invoice_doc);
       }
     },
@@ -1509,7 +1509,10 @@ export default {
     validate() {
       let value = true;
       this.items.forEach((item) => {
-        if (this.pos_profile.posa_max_discount_allowed) {
+        if (
+          this.pos_profile.posa_max_discount_allowed &&
+          !item.posa_offer_applied
+        ) {
           if (item.discount_amount && this.flt(item.discount_amount) > 0) {
             // calc discount percentage
             const discount_percentage =
@@ -1615,7 +1618,7 @@ export default {
             value = false;
             return value;
           }
-          if (this.subtotal * -1 > this.return_doc.total) {
+          if (Math.abs(this.subtotal) > Math.abs(this.return_doc.total)) {
             evntBus.$emit("show_mesage", {
               text: __(`Return Invoice Total should not be higher than {0}`, [
                 this.return_doc.total,
@@ -1640,7 +1643,10 @@ export default {
               });
               value = false;
               return value;
-            } else if (item.qty * -1 > return_item.qty || item.qty >= 0) {
+            } else if (
+              Math.abs(item.qty) > Math.abs(return_item.qty) ||
+              Math.abs(item.qty) == 0
+            ) {
               evntBus.$emit("show_mesage", {
                 text: __(`The QTY of the item {0} cannot be greater than {1}`, [
                   item.item_name,
@@ -2050,61 +2056,9 @@ export default {
       item.batch_no_data = batch_no_data;
     },
 
-    shortCancelDialog(e) {
-      if (e.key === "v" && e.altKey) {
-        e.preventDefault();
-        this.cancel_dialog = true;
-      }
-    },
-
-    shortHoldInvoice(e) {
-      if (e.key === 'F9' || e.key === "b" && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        this.new_invoice();
-      }
-    },
-
-    shortRetriveInvoice(e) {
-      if (e.key === 'F10' || e.key === "b" && e.altKey) {
-        e.preventDefault();
-        this.get_draft_invoices ();
-      }
-    },
-
-    shortReturnInvoice(e) {
-      if (this.pos_profile.posa_allow_return && (e.key === 'F11' || (e.key === 'r' && e.altKey))) {
-        e.preventDefault();
-        this.open_returns ();
-      }
-    },
-
-    shortEditQty(e) {
-      if (e.key === 'F2') {
-        e.preventDefault();
-        this.$refs.qtyField.focus();
-      }
-    },
-
-    shortPlussQty(e) {
-      if (e.key === '-' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        this.subtract_one(this.items[0]);
-      }
-    },
-
-    shortMinusQty(e) {
-      if (e.key === '+' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        this.add_one(this.items[0]);
-      }
-    },
-
     shortOpenPayment(e) {
-      if ((e.key === "s" && (e.ctrlKey || e.metaKey)) || e.key === "F7") {
+      if (e.key === "s" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        if (this.$root) {
-          this.$root.$emit('inputBlurTriggered');
-        }
         this.show_payment();
       }
     },
@@ -2113,27 +2067,14 @@ export default {
       if (e.key === "d" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         this.remove_item(this.items[0]);
-        this.$root.$emit('escEventTriggered');
       }
     },
 
     shortOpenFirstItem(e) {
-      if ((e.key === "q" && (e.ctrlKey || e.metaKey)) || e.key === "F6" || e.key === "+") {
+      if (e.key === "a" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        if (this.$root) {
-          this.$root.$emit('inputBlurTriggered');
-        }
-        if (this.expanded.length > 0) {
-          this.expanded = [];
-          if (this.$root) {
-            this.$root.$emit('escEventTriggered');
-          }
-        } else {
-          if (this.$root) {
-            this.$root.$emit('inputBlurTriggered');
-          }
-          this.expanded.push(this.items[0]);
-        }
+        this.expanded = [];
+        this.expanded.push(this.items[0]);
       }
     },
 
@@ -2783,11 +2724,29 @@ export default {
       });
     },
 
+//    ApplyOnTotal(offer) {
+//      if (!offer.name) {
+//        offer = this.posOffers.find((el) => el.name == offer.offer_name);
+//      }
+//      if (
+//        (!this.discount_percentage_offer_name ||
+//          this.discount_percentage_offer_name == offer.name) &&
+//        offer.discount_percentage > 0 &&
+//        offer.discount_percentage <= 100
+//      ) {
+//        this.discount_amount = this.flt(
+//          (flt(this.Total) * flt(offer.discount_percentage)) / 100,
+//          this.currency_precision
+//        );
+//        this.discount_percentage_offer_name = offer.name;
+//      }
+//    },
     ApplyOnTotal(offer) {
       if (!offer.name) {
         offer = this.posOffers.find((el) => el.name == offer.offer_name);
       }
       if (
+        offer.discount_type === "Discount Percentage" &&
         (!this.discount_percentage_offer_name ||
           this.discount_percentage_offer_name == offer.name) &&
         offer.discount_percentage > 0 &&
@@ -2795,6 +2754,17 @@ export default {
       ) {
         this.discount_amount = this.flt(
           (flt(this.Total) * flt(offer.discount_percentage)) / 100,
+          this.currency_precision
+        );
+        this.discount_percentage_offer_name = offer.name;
+      } else if (
+        offer.discount_type === "Discount Amount" &&
+        (!this.discount_percentage_offer_name ||
+          this.discount_percentage_offer_name == offer.name) &&
+        offer.discount_amount > 0
+      ) {
+        this.discount_amount = this.flt(
+          flt(offer.discount_amount),
           this.currency_precision
         );
         this.discount_percentage_offer_name = offer.name;
@@ -2947,9 +2917,6 @@ export default {
   },
 
   mounted() {
-    this.$nextTick(() => {
-      this.$refs.cancelBtn.focus();
-    });
     evntBus.$on("register_pos_profile", (data) => {
       this.pos_profile = data.pos_profile;
       this.customer = data.pos_profile.customer;
@@ -3031,26 +2998,12 @@ export default {
     evntBus.$off("set_all_items");
   },
   created() {
-    document.addEventListener("keydown", this.shortCancelDialog.bind(this));
-    document.addEventListener("keydown", this.shortHoldInvoice.bind(this));
-    document.addEventListener("keydown", this.shortRetriveInvoice.bind(this));
-    document.addEventListener("keydown", this.shortReturnInvoice.bind(this));
-    document.addEventListener("keydown", this.shortEditQty);
-    document.addEventListener("keydown", this.shortPlussQty);
-    document.addEventListener("keydown", this.shortMinusQty);
     document.addEventListener("keydown", this.shortOpenPayment.bind(this));
     document.addEventListener("keydown", this.shortDeleteFirstItem.bind(this));
     document.addEventListener("keydown", this.shortOpenFirstItem.bind(this));
     document.addEventListener("keydown", this.shortSelectDiscount.bind(this));
   },
   destroyed() {
-    document.removeEventListener("keydown", this.shortCancelDialog);
-    document.removeEventListener("keydown", this.shortHoldInvoice);
-    document.removeEventListener("keydown", this.shortRetriveInvoice);
-    document.removeEventListener("keydown", this.shortReturnInvoice);
-    document.removeEventListener("keydown", this.shortEditQty);
-    document.removeEventListener("keydown", this.shortPlussQty);
-    document.removeEventListener("keydown", this.shortMinusQty);
     document.removeEventListener("keydown", this.shortOpenPayment);
     document.removeEventListener("keydown", this.shortDeleteFirstItem);
     document.removeEventListener("keydown", this.shortOpenFirstItem);

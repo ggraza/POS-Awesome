@@ -3,9 +3,9 @@ from __future__ import unicode_literals
 from . import __version__ as app_version
 
 app_name = "posawesome"
-app_title = "RMS G2Virtu"
+app_title = "POS G2Virtu"
 app_publisher = "Youssef Restom"
-app_description = "RMS G2Virtu"
+app_description = "POS G2Virtu"
 app_icon = "octicon octicon-file-directory"
 app_color = "grey"
 app_email = "youssef@totrox.com"
@@ -17,10 +17,43 @@ app_license = "GPLv3"
 # include js, css files in header of desk.html
 # app_include_css = "/assets/posawesome/css/posawesome.css"
 # app_include_js = "/assets/posawesome/js/posawesome.js"
+# app_include_js = "/assets/posawesome/js/qrcode.js"
+# doctype_js = {"POS Profile" : "public/js/pos_profile.js"}
+# doctype_js = {"Sales Invoice" : "public/js/sales_invoice.js"}
+
+#/posawesome/posawesome/public/js
+# app_include_js = "/assets/posawesome/js/global_toggle_sidebar.js"
+
 app_include_js = [
     "/assets/posawesome/node_modules/vuetify/dist/vuetify.js",
     "posawesome.bundle.js",
 ]
+
+# include js in doctype views
+doctype_js = {
+    "POS Profile": "posawesome/api/pos_profile.js",
+    "Sales Invoice": "posawesome/api/invoice.js",
+    "Company": "posawesome/api/company.js",
+}
+
+doc_events = {
+    "Sales Invoice": {
+        "validate": "posawesome.posawesome.api.invoice.validate",
+        "before_submit": "posawesome.posawesome.api.invoice.before_submit",
+        "on_submit": "posawesome.events.sales_invoice.submit_to_fbr",
+        "before_cancel": "posawesome.posawesome.api.invoice.before_cancel",
+    },
+    "Customer": {
+        "validate": "posawesome.posawesome.api.customer.validate",
+        "after_insert": "posawesome.posawesome.api.customer.after_insert",
+    },
+}
+
+#scheduler_events = {
+#    "hourly": [
+#        "posawesome.scheduler_events.tasks.update_fbr_invoice_data"
+#    ]
+#}
 
 # include js, css files in header of web template
 # web_include_css = "/assets/posawesome/css/posawesome.css"
@@ -33,12 +66,6 @@ app_include_js = [
 # include js in page
 # page_js = {"page" : "public/js/file.js"}
 
-# include js in doctype views
-doctype_js = {
-    "POS Profile": "posawesome/api/pos_profile.js",
-    "Sales Invoice": "posawesome/api/invoice.js",
-    "Company": "posawesome/api/company.js",
-}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -68,8 +95,6 @@ doctype_js = {
 
 # before_install = "posawesome.install.before_install"
 # after_install = "posawesome.install.after_install"
-# before_uninstall = "posawesome.uninstall.before_uninstall"
-after_uninstall = "posawesome.uninstall.after_uninstall"
 
 # Desk Notifications
 # ------------------
@@ -92,18 +117,6 @@ after_uninstall = "posawesome.uninstall.after_uninstall"
 # Document Events
 # ---------------
 # Hook on document methods and events
-
-doc_events = {
-    "Sales Invoice": {
-        "validate": "posawesome.posawesome.api.invoice.validate",
-        "before_submit": "posawesome.posawesome.api.invoice.before_submit",
-        "before_cancel": "posawesome.posawesome.api.invoice.before_cancel",
-    },
-    "Customer": {
-        "validate": "posawesome.posawesome.api.customer.validate",
-        "after_insert": "posawesome.posawesome.api.customer.after_insert",
-    },
-}
 
 # Scheduled Tasks
 # ---------------
@@ -257,6 +270,20 @@ fixtures = [
                     "POS Profile-posa_allow_reconcile_payments",
                     "POS Profile-column_break_uolvm",
                     "POS Profile-posa_allow_mpesa_reconcile_payments",
+                    "POS Profile-hide_sale_amount",
+                    "POS Profile-posa_sales_partner",
+                    "POS Profile-posa_touch_screen",
+                    "POS Profile-sales_partner",
+                    "POS Profile-system_controls",
+                    "POS Profile-advance_settings",
+                    "POS Profile-ntn_no",
+                    "POS Profile-pos_id",
+                    "POS Profile-fbr_pos_token",
+                    "POS Profile-allow_fbr_on_submit",
+                    "Sales Invoice-pos_id",
+                    "Sales Invoice-ntn_no",
+                    "Sales Invoice-fbr_invoice_no",
+                    "Sales Invoice-fbr_pos_token",
                 ),
             ]
         ],

@@ -23,15 +23,31 @@
   "pos_payments",
   "section_break_if3m1",
   "payment_reconciliation_details",
+  "section_break_p4b3z",
+  "denomination_details",
+  "section_break_lqld6",
+  "total_qty",
+  "column_break_bq8fu",
+  "total_amount",
+  "pos_expense_section",
+  "pos_expenses",
+  "net_expense",
   "section_break_11",
   "payment_reconciliation",
   "section_break_13",
+  "return_not_paid",
+  "total_return_invoices",
+  "total_return",
+  "column_break_lxkfr",
+  "discount_on_items",
+  "discount_on_invoice",
+  "total_discount",
+  "column_break_16",
   "grand_total",
   "net_total",
   "total_quantity",
-  "column_break_16",
-  "taxes",
   "section_break_14",
+  "taxes",
   "amended_from"
  ],
  "fields": [
@@ -196,11 +212,97 @@
   {
    "fieldname": "section_break_if3m1",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_p4b3z",
+   "fieldtype": "Section Break",
+   "label": "Closing Balance Denomination"
+  },
+  {
+   "fieldname": "denomination_details",
+   "fieldtype": "Table",
+   "label": "Closing Denomination",
+   "options": "POS Closing Shift Denomination"
+  },
+  {
+   "fieldname": "section_break_lqld6",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "total_qty",
+   "fieldtype": "Float",
+   "label": "Nos.",
+   "precision": "0"
+  },
+  {
+   "fieldname": "column_break_bq8fu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_amount",
+   "fieldtype": "Currency",
+   "label": "Total Cash",
+   "options": "company:company_currency"
+  },
+  {
+   "fieldname": "pos_expenses",
+   "fieldtype": "Table",
+   "label": "POS Expense",
+   "options": "POS Expense Reference"
+  },
+  {
+   "fieldname": "pos_expense_section",
+   "fieldtype": "Section Break",
+   "label": "POS Expense"
+  },
+  {
+   "fieldname": "net_expense",
+   "fieldtype": "Currency",
+   "label": "Net Expense",
+   "options": "company:company_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_return",
+   "fieldtype": "Currency",
+   "label": "Total Return",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_lxkfr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "return_not_paid",
+   "fieldtype": "Currency",
+   "label": "Not Paid Return",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_return_invoices",
+   "fieldtype": "Currency",
+   "label": "Total Return Invoices",
+   "read_only": 1
+  },
+  {
+   "fieldname": "discount_on_items",
+   "fieldtype": "Currency",
+   "label": "Items Discounts"
+  },
+  {
+   "fieldname": "discount_on_invoice",
+   "fieldtype": "Currency",
+   "label": "Invoice Discounts"
+  },
+  {
+   "fieldname": "total_discount",
+   "fieldtype": "Currency",
+   "label": "Total Discount"
   }
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2023-06-12 03:01:49.146706",
+ "modified": "2025-04-14 21:50:59.293784",
  "modified_by": "Administrator",
  "module": "POSAwesome",
  "name": "POS Closing Shift",

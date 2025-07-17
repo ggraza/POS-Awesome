@@ -43,13 +43,13 @@ class POSClosingShift(Document):
         self.update_payment_reconciliation()
 
     def update_payment_reconciliation(self):
-        # update the difference values in Payment Reconciliation child table
-        # get default precision for site
         precision = (
             frappe.get_cached_value("System Settings", None, "currency_precision") or 3
         )
+        total_expense = frappe.db.get_value("POS Expense Invoice", {"pos_opening_shift": self.pos_opening_shift, "docstatus": 1}, "sum(total_expense)") or 0
+
         for d in self.payment_reconciliation:
-            d.difference = +flt(d.closing_amount, precision) - flt(
+            d.difference = +flt(d.closing_amount, precision) + flt(total_expense, precision) - flt(
                 d.expected_amount, precision
             )
 
@@ -115,6 +115,24 @@ def get_pos_invoices(pos_opening_shift):
 
 
 @frappe.whitelist()
+def get_pos_expense_invoice(pos_opening_shift):
+    data = frappe.db.sql(
+        """
+	select
+		name, date, total_expense
+	from
+		`tabPOS Expense Invoice`
+	where
+		docstatus = 1 and pos_opening_shift = %s
+	""",
+        (pos_opening_shift),
+        as_dict=1,
+    )
+
+    return data
+
+
+@frappe.whitelist()
 def get_payments_entries(pos_opening_shift):
     return frappe.get_all(
         "Payment Entry",
@@ -148,6 +166,12 @@ def make_closing_shift_from_opening(opening_shift):
     closing_shift.grand_total = 0
     closing_shift.net_total = 0
     closing_shift.total_quantity = 0
+    closing_shift.total_return = 0
+    closing_shift.return_not_paid = 0
+    closing_shift.total_return_invoices = 0
+    closing_shift.discount_on_items = 0
+    closing_shift.discount_on_invoice = 0
+    closing_shift.total_discount = 0
 
     invoices = get_pos_invoices(opening_shift.get("name"))
 
@@ -166,7 +190,22 @@ def make_closing_shift_from_opening(opening_shift):
             )
         )
 
+    for denomination in opening_shift.get("denomination_details", []):
+        closing_shift.append("denomination_details", {
+            "currency": denomination.get("currency"),
+            "mode_of_denomination": denomination.get("mode_of_denomination"),
+            "opening_qty": denomination.get("qty"),
+            "opening_cash": denomination.get("amount")
+        })
+
     for d in invoices:
+        items_discount = 0
+
+        items = d.get('items')
+        #if items:
+        for item in items:
+            items_discount += flt(item.get('discount_amount', 0))
+
         pos_transactions.append(
             frappe._dict(
                 {
@@ -174,12 +213,32 @@ def make_closing_shift_from_opening(opening_shift):
                     "posting_date": d.posting_date,
                     "grand_total": d.grand_total,
                     "customer": d.customer,
+                    "discount_amount": d.discount_amount,
+                    "items_discount": items_discount,
                 }
             )
         )
         closing_shift.grand_total += flt(d.grand_total)
         closing_shift.net_total += flt(d.net_total)
         closing_shift.total_quantity += flt(d.total_qty)
+
+        discount_on_items = 0
+        discount_on_invoice = flt(d.discount_amount)
+
+        items = d.get('items')
+        if items:
+            for item in items:
+                discount_on_items += flt(item.get('discount_amount', 0))
+
+        closing_shift.discount_on_items += discount_on_items
+        closing_shift.discount_on_invoice += discount_on_invoice
+        closing_shift.total_discount += (discount_on_items + discount_on_invoice)
+
+        if d.is_return == 1:
+            closing_shift.total_return += flt(d.grand_total)
+            closing_shift.total_return_invoices += 1
+        if d.is_return == 1 and d.is_pos == 0:
+            closing_shift.return_not_paid += flt(d.grand_total)
 
         for t in d.taxes:
             existing_tax = [
@@ -265,7 +324,6 @@ def make_closing_shift_from_opening(opening_shift):
 
     return closing_shift
 
-
 @frappe.whitelist()
 def submit_closing_shift(closing_shift):
     closing_shift = json.loads(closing_shift)
@@ -288,3 +346,23 @@ def submit_printed_invoices(pos_opening_shift):
     for invoice in invoices_list:
         invoice_doc = frappe.get_doc("Sales Invoice", invoice.name)
         invoice_doc.submit()
+
+
+@frappe.whitelist()
+def check_open_invoices(pos_opening_shift):
+    open_invoices = frappe.get_list('Sales Invoice', filters={
+        'posa_pos_opening_shift': pos_opening_shift,
+        'docstatus': 0
+    })
+
+    if open_invoices:
+        return {
+            "status": "error",
+            "message": _("Please close all open invoices before closing the shift."),
+            "open_invoices": open_invoices
+        }
+    else:
+        return {
+            "status": "success"
+        }
+

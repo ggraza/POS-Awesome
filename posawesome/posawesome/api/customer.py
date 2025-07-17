@@ -4,6 +4,7 @@
 from __future__ import unicode_literals
 import frappe
 from frappe import _
+from frappe.utils import today
 from posawesome.posawesome.doctype.referral_code.referral_code import (
     create_referral_code,
 )
@@ -49,3 +50,32 @@ def validate_referral_code(doc):
             exist = frappe.db.exists("Referral Code", {"referral_code": referral_code})
         if not exist:
             frappe.throw(_("This Referral Code {0} not exists").format(referral_code))
+
+
+@frappe.whitelist()
+def get_today_customer_count():
+    today_date = today()
+    customer_count = frappe.db.sql("""
+        SELECT COUNT(DISTINCT customer)
+        FROM `tabSales Invoice`
+        WHERE docstatus != 2
+        AND posting_date = %s
+    """, today_date)
+
+    return customer_count[0][0] if customer_count else 0
+
+
+# In posawesome/posawesome/api/customer.py
+
+@frappe.whitelist()
+def get_customers_with_non_canceled_invoices():
+    """
+    Fetch a list of customers who have at least one non-canceled sales invoice.
+    """
+    customers = frappe.db.sql("""
+        SELECT DISTINCT customer
+        FROM `tabSales Invoice`
+        WHERE docstatus != 2
+    """, as_dict=True)
+    
+    return [customer['customer'] for customer in customers]

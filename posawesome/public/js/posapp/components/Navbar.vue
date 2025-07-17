@@ -17,8 +17,8 @@
         style="cursor: pointer"
         class="text-uppercase primary--text"
       >
-        <span class="font-weight-light">RMS</span>
-        <span>G2Virtu</span>
+        <span class="font-weight-light">pos</span>
+        <span>awesome</span>
       </v-toolbar-title>
 
       <v-spacer></v-spacer>
@@ -176,7 +176,7 @@ export default {
     },
     go_about() {
       const win = window.open(
-        'https://www.g2virtu.com',
+        'https://www.g2virtu.com/2024/02/g2-rms.html',
         '_blank'
       );
       win.focus();

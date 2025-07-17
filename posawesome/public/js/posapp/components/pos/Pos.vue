@@ -10,7 +10,7 @@
     <OpeningDialog v-if="dialog" :dialog="dialog"></OpeningDialog>
     <v-row v-show="!dialog">
       <v-col
-        v-show="!payment && !offers && !coupons && !holdinvoice"
+        v-show="!payment && !offers && !coupons"
         xl="5"
         lg="5"
         md="5"
@@ -53,17 +53,6 @@
       >
         <Payments></Payments>
       </v-col>
-      <v-col
-        v-show="holdinvoice"
-        xl="5"
-        lg="5"
-        md="5"
-        sm="5"
-        cols="12"
-        class="pos pr-0"
-      >
-        <HoldInvoice></HoldInvoice>
-      </v-col>
 
       <v-col xl="7" lg="7" md="7" sm="7" cols="12" class="pos">
         <Invoice></Invoice>
@@ -87,7 +76,6 @@ import NewAddress from './NewAddress.vue';
 import Variants from './Variants.vue';
 import Returns from './Returns.vue';
 import MpesaPayments from './Mpesa-Payments.vue';
-import HoldInvoice from './HoldInvoice.vue';
 
 export default {
   data: function () {
@@ -98,7 +86,6 @@ export default {
       payment: false,
       offers: false,
       coupons: false,
-      holdinvoice: false,
     };
   },
 
@@ -116,7 +103,7 @@ export default {
     NewAddress,
     Variants,
     MpesaPayments,
-    HoldInvoice,
+    SalesOrders,
   },
 
   methods: {
@@ -214,26 +201,16 @@ export default {
         this.payment = true ? data === 'true' : false;
         this.offers = false ? data === 'true' : false;
         this.coupons = false ? data === 'true' : false;
-        this.holdinvoice = false ? data === 'true' : false;
       });
       evntBus.$on('show_offers', (data) => {
         this.offers = true ? data === 'true' : false;
         this.payment = false ? data === 'true' : false;
         this.coupons = false ? data === 'true' : false;
-        this.holdinvoice = false ? data === 'true' : false;
       });
       evntBus.$on('show_coupons', (data) => {
         this.coupons = true ? data === 'true' : false;
         this.offers = false ? data === 'true' : false;
         this.payment = false ? data === 'true' : false;
-        this.holdinvoice = false ? data === 'true' : false;
-      });
-      evntBus.$on('show_hold', (data) => {
-        this.holdinvoice = true ? data === 'true': false;
-        this.coupons = false ? data === 'true' : false;
-        this.offers = false ? data === 'true' : false;
-        this.payment = false ? data === 'true' : false;
-        console.info('LoadHoldInvoice');
       });
       evntBus.$on('open_closing_dialog', () => {
         this.get_closing_data();
@@ -249,7 +226,6 @@ export default {
     evntBus.$off('LoadPosProfile');
     evntBus.$off('show_offers');
     evntBus.$off('show_coupons');
-    evntBus.$off('show_hold');
     evntBus.$off('open_closing_dialog');
     evntBus.$off('submit_closing_pos');
   },
